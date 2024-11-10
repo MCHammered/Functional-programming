@@ -1,0 +1,11 @@
+fun prTestEq seed expr1 expr2 = 
+  let      
+    fun doloci seed [] = []
+      | doloci (Next i) (glava::rep) = if int2bool (#1 i) then glava :: (doloci ((#2 i) ()) rep) else (doloci ((#2 i) ()) rep)
+
+    val spr_expr1 = getVars expr1
+    val spr_expr2 = getVars expr2
+    val koncni_seznam = doloci (lcg seed) (isolate (spr_expr1 @ spr_expr2))
+  in
+    eval koncni_seznam expr1 = eval koncni_seznam expr2
+  end

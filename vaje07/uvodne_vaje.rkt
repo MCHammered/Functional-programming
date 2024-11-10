@@ -1,0 +1,150 @@
+#lang racket
+
+;; MUTACIJE
+;; mutirane "škatle" (ne bomo uporabljali)
+;; - ustvarjanje: (box v)
+;; - dereferenciranje: (unbox box)
+;; - prirejanje (set-box! box v)
+
+;; mutirani pari/seznami
+;; - testiranje tipa: (mpair? v)
+;; - ustvarjanje: (mcons a d)
+;; - dereferenciranje: (mcar p) (mcdr p)
+;; - prirejanje (set-mcar! p v) (set-mcdr! p v)
+
+
+;; ZAKASNITEV/SPROŽITEV s predavanj
+;; (zakasni thunk)   `thunk` mora biti funkcija brez argumentov
+(define (zakasni thunk)
+  (mcons #f thunk))
+
+;; (sproži prom)  `prom` mora biti mutiran par,
+;;  ki je rezultat klica funcije `zakasni`.
+(define (sproži prom)
+  (if (mcar prom)
+      (mcdr prom)
+      (begin (set-mcar! prom #t)
+             (set-mcdr! prom ((mcdr prom)))
+             (mcdr prom))))
+
+
+;; Naša implementacija zakasnitev/sprožitev.
+(define a (zakasni (λ () (/ 1 2 3 4))))
+; a (sproži a) a (sproži a)
+
+;; Racket-ova implementacija zakasnitev/sprožitev.
+(define b (delay (λ () 101)))
+; b (force b) b
+
+(define c (delay 123))
+; c (force c) c
+
+;; Še nekaj primerov z zakasnitvami.
+;; počasno seštevanje
+(define (počasno+ a b)
+  (begin
+    (sleep b)
+    (+ a b)))
+
+(define dta (delay (počasno+ 1000 2)))
+(define (ta) (počasno+ 1000 2))
+;(force dta)
+;(ta)
+;(force dta)
+
+
+;; THUNKING
+;; (λ () a) = (thunk a)
+
+
+;; TOKOVI
+;; Kakšna je razlika med `enkef` in `enke`?
+(define (enke2)
+  (cons 11 enke2))
+(define enke
+  (cons 11 (λ () enke)))
+
+(define enke*
+  (cons 11 (thunk enke*)))
+
+
+;; CIKLIČNI TOK
+;; Implementiranj tok `tok123`, ki ga
+;;  definira zaporedje 1 2 3 1 2 3 1 ...
+
+; <rešitev>
+(define tok123
+  (let tok123 ([a 1] [b 2] [c 3])         ; let je lokalno okolje (podobno kot v SMLju)
+    (cons a (thunk (tok123 b c a)))))
+
+;; Implementiranj funkcijo `ponavljaj`, ki
+;;  prejme seznam iz iz njega naredi tok.
+;; Primer:
+;; (ponavljaj (list 1 2)): 1 2 1 2 1 2...
+
+; <rešitev>
+(define (ponavljaj s)
+  (let loop ([sez s])
+    (match sez                             ; podobno kot case v SMLju
+      ['() (ponavljaj s)]
+      [(cons h t) (cons h (thunk (loop t)))])))
+      
+
+
+;; PRETVORBA V SEZNAM
+;; Implementiranj funkcijo `vzemi`, ki iz prvih
+;;  `n` elementov toka zgradi seznam.
+;; Primer:
+;; (vzemi 4 tok123): '(1 2 3 1)
+
+; <rešitev>
+(define (vzemi n tok)
+  (match tok
+    [_ #:when (zero? n) '()]
+    [(cons h t) (cons h (vzemi (sub1 n) (t)))]))
+
+;; ZLIVANJE TOKOV
+;; Implementiranj funkcijo `zadrga`,
+;;  ki zlije dva tokova v nov tok.
+;; Primer:
+;; s1: 1 2 3 ...
+;; s2: a b c ...
+;; (zadrga s1 s2): 1 a 2 b 3 c ...
+
+; <rešitev>
+(define (zadrga tok1 tok2)
+  (match* (tok1 tok2)
+    [((cons h1 t1) (cons h2 t2)) (cons h1 (thunk (cons h2 (thunk (zadrga (t1) (t2))))))]))
+  
+  
+
+; SML OPCIJE S SML SINTAKSO V RACKET-U
+
+(struct some (a) #:transparent)
+(struct none () #:transparent)
+
+(define-syntax sml
+  (syntax-rules (valOf isSome SOME NONE)
+    [(sml NONE) (none)]
+    [(sml SOME a) (some a)]
+    [(sml valOf a) (some-a a)]
+    [(sml isSome a) (some? a)]))
+
+(define (rotate sez) (append (cdr sez) (list (car sez))))
+
+(define (x f sez)
+  (let tok ([s sez])
+    (cons s (thunk (tok (rotate s))))))
+
+(define (izpisi n tok)
+  (if (> n 1) 
+      (begin
+        (displayln (car tok))
+        (izpisi (- n 1) ((cdr tok))))
+      (displayln (car tok))))
+
+(define (izpisi2 e1 e2 e3)
+  (display e1)
+  (display e2)
+  (display e3)
+  (if (> e1 1) e2 e3))

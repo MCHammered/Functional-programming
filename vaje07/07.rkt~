@@ -1,0 +1,70 @@
+#lang racket
+
+;; tok ones, ki ustreza zaporedju samih enic (1 1 1 ...)
+
+(define ones
+  (let tok ()
+    (cons 1 (thunk (tok)))))
+
+;; tok naturals, ki ustreza zaporedju naravnih števil (1 2 3 4 ...)
+
+(define naturals
+  (let tok ([n 1])
+    (cons n (thunk (tok (+ n 1))))))
+
+;; tok fibs, ki ustreza zaporedju Fibonaccijevih števil (1 1 2 3 5 ...)
+
+(define fibs
+  (let tok ([a 1] [b 1])
+    (cons a (thunk (tok b (+ a b))))))
+
+;; first, ki sprejme število n in tok, ter vrne seznam prvih n števil iz toka.
+
+(define (first n tok)
+  (match tok
+    [_ #:when (zero? n) '()]
+    [(cons h t) (cons h (first (sub1 n) (t)))]))
+
+;; squares, ki sprejme tok, in vrne nov tok, ki vsebuje kvadrirane elemente prvega toka.
+
+(define (squares tok)
+  (cons (expt (car tok) 2) (thunk (squares ((cdr tok))))))
+
+;; makro sml, ki podpira uporabo "SML sintakse" za delo s seznami.
+;;  Podprite SML funkcije/konstruktorje ::, hd, tl, null in nil.
+;;  Sintaksa naj bo taka, kot je navedena v primeru uporabe spodaj.
+;;  (Sintaksa seveda ne bo povsem enaka SML-jevi,
+;;  saj zaradi zahtev Racketa še vedno ne smemo pisati odvečnih oklepajev, potrebno pa je pisati presledke okoli funkcij/parametrov, pa vseeno.)
+
+
+(define-syntax sml
+  (syntax-rules (nil null hd tl ::)
+    [(sml nil) '()]
+    [(sml null a) (null? a)]
+    [(sml hd a) (car a)]
+    [(sml tl a) (cdr a)]
+    [(sml a :: null) (list a)]
+    [(sml a :: b) (cons a b)]))
+
+;; my-delay, my-force. Funkciji za zakasnitev in sprožitev delujeta tako,
+;;  da si funkcija za sprožitev pri prvem klicu zapomni rezultat, ob naslednjih pa vrne shranjeno vrednost.
+;;  Popravite funkciji tako, da bo funkcija za sprožitev ob prvem in nato ob vsakem petem klicu ponovno izračunala in shranila rezultat.
+
+(define (my-delay thunk)
+  (mcons 0 (mcons thunk (lambda () thunk))))
+
+(define (my-force arg)
+  (set-mcar! arg (modulo (mcar arg) 5))
+  (cond [(zero? (mcar arg))
+         (set-mcar! arg (+ (mcar arg) 1)) ((mcar (mcdr arg)))]
+        [#t (set-mcar! arg (+ (mcar arg) 1)) ((mcdr (mcdr arg)))]))
+
+;; partitions, ki sprejme števili k in n, ter vrne število različnih načinov,
+;; na katere lahko n zapišemo kot vsoto k naravnih števil (naravna števila se v tem kontekstu začnejo z 1).
+;; Če se dva zapisa razlikujeta samo v vrstnem redu elementov vsote, ju obravnavamo kot en sam zapis.
+
+(define (partitions k n)
+  (cond [(and (zero? k) (zero? n)) 1]
+        [(or (>= 0 k) (>= 0 n)) 0]
+        [#t (+ (partitions k (- n k)) (partitions (sub1 k) (sub1 n)))]))
+
